@@ -48,8 +48,8 @@ load_configuration()
 ###############################################################################
 
 
-class jackett(object):
-    name = 'Jackett'
+class jackettrutor(object):
+    name = 'JackettRuTor'
     url = CONFIG_DATA['url'] if CONFIG_DATA['url'][-1] != '/' else CONFIG_DATA['url'][:-1]
     api_key = CONFIG_DATA['api_key']
     supported_categories = {
@@ -95,7 +95,7 @@ class jackett(object):
         if category is not None:
             params.append(('cat', ','.join(category)))
         params = urlencode(params)
-        jacket_url = self.url + "/api/v2.0/indexers/all/results/torznab/api?%s" % params
+        jacket_url = self.url + "/api/v2.0/indexers/rutor/results/torznab/api?%s" % params
         response = self.get_response(jacket_url)
         if response is None:
             self.handle_error("connection error", what)
@@ -193,5 +193,5 @@ class jackett(object):
 
 
 if __name__ == "__main__":
-    jackett_se = jackett()
+    jackett_se = jackettrutor()
     jackett_se.search("ubuntu server", 'software')
