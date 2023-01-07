@@ -62,6 +62,7 @@ class jackett(object):
         'software': ['4000'],
         'tv': ['5000'],
     }
+    jackettIndexerName = 'all'
 
     def download_torrent(self, download_url):
         # fix for some indexers with magnet link inside .torrent file
@@ -95,7 +96,7 @@ class jackett(object):
         if category is not None:
             params.append(('cat', ','.join(category)))
         params = urlencode(params)
-        jacket_url = self.url + "/api/v2.0/indexers/all/results/torznab/api?%s" % params
+        jacket_url = self.url + "/api/v2.0/indexers/" + self.jackettIndexerName + "/results/torznab/api?%s" % params
         response = self.get_response(jacket_url)
         if response is None:
             self.handle_error("connection error", what)
