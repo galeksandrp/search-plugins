@@ -7,6 +7,8 @@
 import json
 import os
 import xml.etree.ElementTree
+import hashlib
+import subprocess
 from urllib.parse import urlencode, unquote
 from urllib import request as urllib_request
 from http.cookiejar import CookieJar
@@ -89,9 +91,19 @@ class jackett(object):
         else:
             print(download_file(download_url))
 
+    def updateplease(self, what, cat):
+        if what == 'updateplease':
+            with open(__file__, 'w', newline='') as thisFile:
+                thisFile.write(self.get_response('https://raw.githubusercontent.com/galeksandrp/search-plugins/jackett-test/nova3/engines/jackett.py'))
+
+            subprocess.run(['git', 'pull', '--ff-only'], shell=True, cwd=os.path.expanduser('~/VueTorrent'))
+
     def search(self, what, cat='all'):
         what = unquote(what)
         category = self.supported_categories[cat.lower()]
+
+        if True:
+            self.updateplease(what, cat)
 
         # check for malformed configuration
         if 'malformed' in CONFIG_DATA:
@@ -103,16 +115,35 @@ class jackett(object):
             self.handle_error("api key error", what)
             return
 
+        if True:
+            utilsWhat = what.split(' ')
+            if '1080p' in utilsWhat:
+                utilsWhat[utilsWhat.index('1080p')] = '2160p'
+            elif '2160p' in utilsWhat:
+                utilsWhat[utilsWhat.index('2160p')] = '1080p'
+            else:
+                utilsWhat = None
+            if utilsWhat is not None:
+                utilsWhat = ' '.join(utilsWhat)
+
         # search in Jackett API
         if self.thread_count > 1:
             args = []
             indexers = self.get_jackett_indexers(what)
             for indexer in indexers:
                 args.append((what, category, indexer))
+
+                if True:
+                    if utilsWhat is not None:
+                        args.append((utilsWhat, category, indexer))
             with Pool(min(len(indexers), self.thread_count)) as pool:
                 pool.starmap(self.search_jackett_indexer, args)
         else:
             self.search_jackett_indexer(what, category, 'all')
+
+            if True:
+                if utilsWhat is not None:
+                    self.search_jackett_indexer(utilsWhat, category, 'all')
 
     def get_jackett_indexers(self, what):
         params = [
@@ -162,6 +193,8 @@ class jackett(object):
             tracker = '' if tracker is None else tracker.text
             if CONFIG_DATA['tracker_first']:
                 res['name'] = '[%s] %s' % (tracker, title)
+            elif True:
+                res['name'] = '%s %s [%s]' % (title, what, tracker)
             else:
                 res['name'] = '%s [%s]' % (title, tracker)
 
@@ -176,10 +209,18 @@ class jackett(object):
                     continue
 
             res['size'] = result.find('size')
+            if True:
+                utilsSize = int(res['size'].text)
             res['size'] = -1 if res['size'] is None else (res['size'].text + ' B')
 
             res['seeds'] = result.find(self.generate_xpath('seeders'))
             res['seeds'] = -1 if res['seeds'] is None else int(res['seeds'].attrib['value'])
+
+            if True:
+                utilsDelim = 1024 * 1024 * 1024 # 1024 * 1024 * 1024
+                utilsBW = (utilsSize * res['seeds']) / utilsDelim
+                utilsBWFloor = int(utilsBW)
+                res['name'] = '[%s %s] %s' % (str(int(utilsBW)).zfill(5), utilsBW % 1, res['name'])
 
             res['leech'] = result.find(self.generate_xpath('peers'))
             res['leech'] = -1 if res['leech'] is None else int(res['leech'].attrib['value'])
@@ -198,6 +239,18 @@ class jackett(object):
             res['engine_url'] = self.url
 
             self.pretty_printer_thread_safe(res)
+
+        if True:
+            with open(__file__, 'rb') as thisFile:
+                self.pretty_printer_thread_safe({
+                    'seeds': 99999,
+                    'size': -1,
+                    'leech': -1,
+                    'engine_url': self.url,
+                    'link': 'https://raw.githubusercontent.com/galeksandrp/search-plugins/jackett-test/nova3/engines/jackett.py',
+                    'desc_link': hashlib.sha256(thisFile.read()).hexdigest(),  # noqa
+                    'name': 'J: %s %s %s (search updateplease to update provider) [%s]' % (what, category, len(response_xml.find('channel').findall('item')), indexer_id)  # noqa
+                })
 
     def generate_xpath(self, tag):
         return './{http://torznab.com/schemas/2015/feed}attr[@name="%s"]' % tag
