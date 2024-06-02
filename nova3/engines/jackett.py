@@ -1,4 +1,4 @@
-#VERSION: 4.0
+#VERSION: 1.0
 # AUTHORS: Diego de las Heras (ngosang@hotmail.es)
 # CONTRIBUTORS: ukharley
 #               hannsen (github.com/hannsen)
@@ -19,11 +19,11 @@ from helpers import download_file
 
 ###############################################################################
 # load configuration from file
-CONFIG_FILE = 'jackett.json'
+CONFIG_FILE = 'prowlarr.json'
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), CONFIG_FILE)
 CONFIG_DATA = {
-    'api_key': 'YOUR_API_KEY_HERE',  # jackett api
-    'url': 'http://127.0.0.1:9117',  # jackett url
+    'api_key': 'YOUR_API_KEY_HERE',  # prowlarr api
+    'url': 'http://127.0.0.1:9696',  # prowlarr url
     'tracker_first': False,          # (False/True) add tracker name to beginning of search result
     'thread_count': 20,              # number of threads to use for http requests
 }
@@ -63,8 +63,8 @@ load_configuration()
 ###############################################################################
 
 
-class jackett(object):
-    name = 'Jackett'
+class prowlarr(object):
+    name = 'Prowlarr'
     url = CONFIG_DATA['url'] if CONFIG_DATA['url'][-1] != '/' else CONFIG_DATA['url'][:-1]
     api_key = CONFIG_DATA['api_key']
     thread_count = CONFIG_DATA['thread_count']
@@ -103,46 +103,45 @@ class jackett(object):
             self.handle_error("api key error", what)
             return
 
-        # search in Jackett API
+        # search in Prowlarr API
         if self.thread_count > 1:
             args = []
-            indexers = self.get_jackett_indexers(what)
+            indexers = self.get_prowlarr_indexers(what)
             for indexer in indexers:
                 args.append((what, category, indexer))
             with Pool(min(len(indexers), self.thread_count)) as pool:
-                pool.starmap(self.search_jackett_indexer, args)
+                pool.starmap(self.search_prowlarr_indexer, args)
         else:
-            self.search_jackett_indexer(what, category, 'all')
+            self.search_prowlarr_indexer(what, category, 'all')
 
-    def get_jackett_indexers(self, what):
+    def get_prowlarr_indexers(self, what):
         params = [
-            ('apikey', self.api_key),
-            ('t', 'indexers'),
-            ('configured', 'true')
+            ('apikey', self.api_key)
         ]
         params = urlencode(params)
-        jacket_url = self.url + "/api/v2.0/indexers/all/results/torznab/api?%s" % params
+        jacket_url = self.url + "/api/v1/indexer?%s" % params
         response = self.get_response(jacket_url)
         if response is None:
             self.handle_error("connection error getting indexer list", what)
             return
         # process results
-        response_xml = xml.etree.ElementTree.fromstring(response)
+        response_json = json.loads(response)
         indexers = []
-        for indexer in response_xml.findall('indexer'):
-            indexers.append(indexer.attrib['id'])
+        for indexer in response_json:
+            indexers.append(indexer['id'])
         return indexers
 
-    def search_jackett_indexer(self, what, category, indexer_id):
-        # prepare jackett url
+    def search_prowlarr_indexer(self, what, category, indexer_id):
+        # prepare prowlarr url
         params = [
             ('apikey', self.api_key),
-            ('q', what)
+            ('q', what),
+            ('t', 'search')
         ]
         if category is not None:
             params.append(('cat', ','.join(category)))
         params = urlencode(params)
-        jacket_url = self.url + "/api/v2.0/indexers/" + indexer_id + "/results/torznab/api?%s" % params  # noqa
+        jacket_url = self.url + "/" + str(indexer_id) + "/api?%s" % params  # noqa
         response = self.get_response(jacket_url)
         if response is None:
             self.handle_error("connection error for indexer: " + indexer_id, what)
@@ -158,7 +157,7 @@ class jackett(object):
             else:
                 continue
 
-            tracker = result.find('jackettindexer')
+            tracker = result.find('prowlarrindexer')
             tracker = '' if tracker is None else tracker.text
             if CONFIG_DATA['tracker_first']:
                 res['name'] = '[%s] %s' % (tracker, title)
@@ -226,8 +225,8 @@ class jackett(object):
             'leech': -1,
             'engine_url': self.url,
             'link': self.url,
-            'desc_link': 'https://github.com/qbittorrent/search-plugins/wiki/How-to-configure-Jackett-plugin',  # noqa
-            'name': "Jackett: %s! Right-click this row and select 'Open description page' to open help. Configuration file: '%s' Search: '%s'" % (error_msg, CONFIG_PATH, what)  # noqa
+            'desc_link': 'https://github.com/qbittorrent/search-plugins/wiki/How-to-configure-Prowlarr-plugin',  # noqa
+            'name': "Prowlarr: %s! Right-click this row and select 'Open description page' to open help. Configuration file: '%s' Search: '%s'" % (error_msg, CONFIG_PATH, what)  # noqa
         })
 
     def pretty_printer_thread_safe(self, dictionary):
@@ -244,5 +243,5 @@ class jackett(object):
 
 
 if __name__ == "__main__":
-    jackett_se = jackett()
-    jackett_se.search("ubuntu server", 'software')
+    prowlarr_se = prowlarr()
+    prowlarr_se.search("ubuntu server", 'software')
