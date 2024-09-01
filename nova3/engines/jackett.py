@@ -7,6 +7,8 @@
 import json
 import os
 import xml.etree.ElementTree
+if True:
+    import hashlib
 from urllib.parse import urlencode, unquote
 from urllib import request as urllib_request
 from http.cookiejar import CookieJar
@@ -30,6 +32,8 @@ CONFIG_DATA = {
     'thread_count': 20,              # number of threads to use for http requests
 }
 PRINTER_THREAD_LOCK = Lock()
+if True:
+    BYTES_IN_GB = 1024 * 1024 * 1024
 
 
 def load_configuration():
@@ -80,6 +84,10 @@ class jackett(object):
         'software': ['4000'],
         'tv': ['5000'],
     }
+    if True:
+        utilsIndexers = {}
+        utilsLines = 1
+        utilsIndexersTotal = 0
 
     def download_torrent(self, download_url):
         # fix for some indexers with magnet link inside .torrent file
@@ -116,6 +124,18 @@ class jackett(object):
         else:
             self.search_jackett_indexer(what, category, 'all')
 
+        if True:
+            with open(__file__, 'rb') as thisFile:
+                self.pretty_printer_thread_safe({
+                    'seeds': 99999,
+                    'size': -1,
+                    'leech': -1,
+                    'engine_url': self.url,
+                    'link': 'https://raw.githubusercontent.com/galeksandrp/search-plugins/jackett-test/nova3/engines/jackett.py',
+                    'desc_link': hashlib.sha256(thisFile.read()).hexdigest(),  # noqa
+                    'name': 'J: [%s] %s %s %s total %s' % (self.utilsLines, what, category, self.utilsIndexers, self.utilsIndexersTotal)  # noqa
+                })
+
     def get_jackett_indexers(self, what):
         params = [
             ('apikey', self.api_key),
@@ -134,7 +154,11 @@ class jackett(object):
         if self.name  == 'Prowlarr':
             indexers = []
             for indexer in json.loads(response):
-                indexers.append(str(indexer['id']))
+                if True:
+                    if indexer['enable']:
+                        indexers.append(indexer)
+                else:
+                    indexers.append(str(indexer['id']))
             return indexers
         response_xml = xml.etree.ElementTree.fromstring(response)
         indexers = []
@@ -143,6 +167,11 @@ class jackett(object):
         return indexers
 
     def search_jackett_indexer(self, what, category, indexer_id):
+        if True:
+            indexer_name = indexer_id
+            if self.name  == 'Prowlarr':
+                indexer_name = indexer_id['name']
+                indexer_id = str(indexer_id['id'])
         # prepare jackett / prowlarr url
         params = [
             ('apikey', self.api_key),
@@ -156,7 +185,10 @@ class jackett(object):
         jacket_url = self.url + ("/" + indexer_id + "/api?%s" if self.name  == 'Prowlarr' else "/api/v2.0/indexers/" + indexer_id + "/results/torznab/api?%s") % params  # noqa
         response = self.get_response(jacket_url)
         if response is None:
-            self.handle_error("connection error for indexer: " + indexer_id, what)
+            if True:
+                self.handle_error("connection error for indexer: " + indexer_name, what)
+            else:
+                self.handle_error("connection error for indexer: " + indexer_id, what)
             return
         # process search results
         response_xml = xml.etree.ElementTree.fromstring(response)
@@ -192,6 +224,11 @@ class jackett(object):
             res['seeds'] = result.find(self.generate_xpath('seeders'))
             res['seeds'] = -1 if res['seeds'] is None else int(res['seeds'].attrib['value'])
 
+            if True:
+                utilsSizeInt = int(result.find('size').text)
+                res['name'] = '%s %s [%s] [%s]' % (title, what, tracker, 'MOREGB' if utilsSizeInt > (9 * BYTES_IN_GB) else '')
+                res['name'] = '[%s] %s' % ('%017.10f'%((utilsSizeInt * res['seeds']) / BYTES_IN_GB), res['name'])
+
             res['leech'] = result.find(self.generate_xpath('peers'))
             res['leech'] = -1 if res['leech'] is None else int(res['leech'].attrib['value'])
 
@@ -209,6 +246,24 @@ class jackett(object):
             res['engine_url'] = self.url
 
             self.pretty_printer_thread_safe(res)
+
+        if True:
+            self.utilsIndexers[indexer_name] = len(response_xml.find('channel').findall('item'))
+            self.utilsIndexersTotal = self.utilsIndexersTotal + 1;
+
+            if len(self.utilsIndexers) > 2:
+                with open(__file__, 'rb') as thisFile:
+                    self.pretty_printer_thread_safe({
+                        'seeds': 99999,
+                        'size': -1,
+                        'leech': -1,
+                        'engine_url': self.url,
+                        'link': 'https://raw.githubusercontent.com/galeksandrp/search-plugins/jackett-test/nova3/engines/jackett.py',
+                        'desc_link': hashlib.sha256(thisFile.read()).hexdigest(),  # noqa
+                        'name': 'J: [%s] %s %s %s' % (self.utilsLines, what, category, self.utilsIndexers)  # noqa
+                    })
+                self.utilsLines = self.utilsLines + 1
+                self.utilsIndexers = {}
 
     def generate_xpath(self, tag):
         return './{http://torznab.com/schemas/2015/feed}attr[@name="%s"]' % tag
